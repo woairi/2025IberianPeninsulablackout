@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>풍력 발전 예측 웹 시스템 평가 SPA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #FDF6E3; /* Soft Parchment */
+            color: #4A3B31; /* Dark Sepia */
+        }
+        .sticky-nav {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background-color: rgba(253, 246, 227, 0.85); /* Semi-transparent Soft Parchment */
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .nav-link {
+            color: #8C6B5D; /* Muted Terracotta */
+            font-weight: 500;
+            padding: 0.5rem 0.75rem; /* Adjusted padding for more links */
+            border-radius: 0.375rem;
+            transition: background-color 0.3s, color 0.3s;
+            font-size: 0.875rem; /* Slightly smaller font for more links */
+        }
+        .nav-link:hover, .nav-link.active {
+            background-color: #8C6B5D; /* Muted Terracotta */
+            color: #FDF6E3; /* Soft Parchment */
+        }
+        h1, h2, h3, h4 {
+            color: #8C6B5D; /* Muted Terracotta */
+        }
+        .content-card {
+            background-color: #EAE0D1; /* Light Stone */
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+        }
+        .table-container {
+            overflow-x: auto;
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0,0,0,0.05), 0 1px 2px 0 rgba(0,0,0,0.03);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #D1C4E9; /* Lighter version of accent for subtlety */
+            padding: 0.75rem;
+            text-align: left;
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+        th {
+            background-color: #A1887F; /* Lighter, muted brown for table headers */
+            color: #FDF6E3;
+            font-weight: 500;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #F5F1E9; /* Very light beige for alternate rows */
+        }
+        .checklist-item {
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        .checklist-item::before {
+            content: '✔️';
+            position: absolute;
+            left: 0;
+            color: #B08D57; /* Antique Brass */
+        }
+        .reference-link {
+            color: #B08D57;
+            font-weight: 500;
+            text-decoration: none;
+        }
+        .reference-link:hover {
+            text-decoration: underline;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px; /* Slightly smaller max-width for SPA context */
+            margin-left: auto;
+            margin-right: auto;
+            height: 280px; /* Adjusted height */
+            max-height: 350px; /* Adjusted max-height */
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 320px;
+            }
+        }
+        .section-intro {
+            font-size: 1.125rem;
+            line-height: 1.75;
+            margin-bottom: 1rem;
+            background-color: rgba(234, 224, 209, 0.5); /* Light Stone with transparency */
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border-left: 4px solid #B08D57;
+        }
+    </style>
+    <!-- Visualization & Content Choices:
+        - Report Text: Presented directly with clear typography and structure (headings, lists, paragraphs). Goal: Inform. Method: HTML/Tailwind. Interaction: Scroll navigation. Justification: Direct representation of source.
+        - 표 1 (SCADA/기상 데이터 파라미터): Goal: Organize/Inform. Method: HTML Table + Tailwind. Interaction: None (static). Justification: Clear presentation of tabular data from report. No SVG/Mermaid.
+        - 표 2 (예측 모델 성능 지표): Goal: Organize/Inform. Method: HTML Table + Tailwind. Interaction: None (static). Justification: Clear presentation of metrics. No SVG/Mermaid.
+        - 표 3 (MLOps 체크리스트): Goal: Organize/Inform. Method: HTML Table + Tailwind. Interaction: None (static). Justification: Clear presentation of checklist. No SVG/Mermaid.
+        - 표 4 (대시보드 사용성 체크리스트): Goal: Organize/Inform. Method: HTML Table + Tailwind. Interaction: None (static). Justification: Clear presentation of checklist. No SVG/Mermaid.
+        - 표 5 (웹 시스템 품질 속성 평가): Goal: Organize/Inform. Method: HTML Table + Tailwind. Interaction: None (static). Justification: Clear presentation of checklist. No SVG/Mermaid.
+        - Illustrative Charts:
+            - MLOps 재학습 트리거 효과 (Bar Chart, Chart.js Canvas). Goal: Compare/Inform. Justification: Illustrate MLOps concept. No SVG/Mermaid.
+            - 대시보드 사용자 중요도 (Radar Chart, Chart.js Canvas). Goal: Compare/Inform. Justification: Illustrate dashboard design concept. No SVG/Mermaid.
+        - Process Flows (e.g., MLOps pipeline components): Goal: Organize. Method: Styled HTML lists/divs (Flexbox/Grid) + Tailwind. Interaction: None. Justification: Visual representation of steps without SVG/Mermaid.
+        - Icons: Goal: Inform/Enhance. Method: Unicode characters (✔️). Justification: Simple visual cues. No SVG/Mermaid.
+    -->
+    </head>
+<body>
+
+    <nav class="sticky-nav">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-wrap justify-center items-center space-x-1 sm:space-x-2">
+                <a href="#intro" class="nav-link">서론</a>
+                <a href="#data-foundation" class="nav-link">데이터</a>
+                <a href="#prediction-modeling" class="nav-link">모델링</a>
+                <a href="#mlops" class="nav-link">MLOps</a>
+                <a href="#web-system" class="nav-link">웹시스템</a>
+                <a href="#overall-verification" class="nav-link">전체검증</a>
+                <a href="#conclusion" class="nav-link">결론</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4 sm:p-6 md:p-8">
+        <header class="text-center my-8 sm:my-10">
+            <h1 class="text-3xl sm:text-4xl font-bold mb-3">풍력 발전 예측 웹 시스템 평가</h1>
+            <p class="text-lg sm:text-xl text-[#4A3B31]">대화형 평가 보고서 SPA</p>
+        </header>
+
+        <section id="intro" class="scroll-mt-20 mb-10">
+            <h2 class="text-2xl font-semibold border-b-2 border-[#B08D57] pb-2 mb-4">서론</h2>
+            <div class="content-card">
+                <p class="section-intro">본 보고서는 SCADA(Supervisory Control and Data Acquisition) 데이터와 기상 예보 데이터를 활용하여 기상 예측 모델 및 발전량 예측 모델을 구축하고, 주기적으로 자동 학습하여 모델을 업데이트하는 풍력 발전 예측 웹 시스템의 완성도를 평가하기 위한 핵심 점검 사항 및 체크리스트를 제공하는 것을 목적으로 합니다. 초기 화면에 대시보드를 포함하는 이 시스템의 평가는 데이터 관리, 예측 모델링, MLOps (Machine Learning Operations), 웹 시스템 및 대시보드 기능, 그리고 전반적인 시스템 품질 측면을 포괄적으로 다룹니다.</p>
+            </div>
+        </section>
+
+        <section id="data-foundation" class="scroll-mt-20 mb-10">
+            <h2 class="text-2xl font-semibold border-b-2 border-[#B08D57] pb-2 mb-4">I. 데이터 기반: 무결성 및 관리</h2>
+            <div class="content-card">
+                <p class="section-intro">모든 예측 시스템의 성패는 입력 데이터의 품질, 신뢰성, 그리고 효과적인 관리에 달려있습니다. 견고한 데이터 관행 없이는 가장 정교한 모델도 정확한 예측을 제공하기 어렵습니다. 본 섹션에서는 SCADA 데이터, 기상 예보 데이터, 그리고 전반적인 데이터 거버넌스 프레임워크를 심층적으로 검토합니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">A. SCADA 데이터: 수집, 검증 및 전처리</h3>
+                <p class="mb-3">풍력 발전기의 운영 상태를 실시간으로 반영하는 SCADA 데이터는 발전량 예측의 핵심 입력 정보입니다. 따라서 SCADA 데이터의 수집 범위, 품질 관리, 전처리 과정은 시스템의 예측 정확도에 직접적인 영향을 미칩니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>포괄적인 파라미터 수집 범위:</strong> 시스템이 발전량, 로터 속도, 실제 풍속, 풍향 외에도 터빈 상태, 오류 코드, 주요 부품 온도(예: 기어박스 베어링), 주변 온도, 나셀 방향, 이론적 발전량 곡선 값 등 예측 모델 성능 향상에 기여할 수 있는 모든 중요 SCADA 파라미터를 수집하고 있는지 확인해야 합니다.[1, 2, 3] IEC61400-25 표준에서 언급된 논리 노드(예: WTUR, WROT, WGEN, WNAC, WYAW) 관련 데이터 포인트들이 충분히 활용되고 있는지도 검토 대상입니다.[4] 특히 "전력 및 에너지", "터빈 시스템 상태, 결함, 경고", "풍속 및 풍향", "온도", "로터 속도", "나셀 방향" 등은 핵심 채널로 간주됩니다.[3]</li>
+                    <li class="checklist-item"><strong>데이터 수집 주기 및 해상도:</strong> 데이터 수집 간격(예: 10분 간격 [1, 5])이 예측 시간 범위(forecasting horizon)와 모델 요구사항에 적합한지 평가해야 합니다. 일반적으로 10분 평균 SCADA 데이터가 많이 사용되지만, 고해상도 데이터는 계산 비용 증가의 부담에도 불구하고 모델 성능 개선에 이점을 줄 수 있습니다.[2] 시스템의 데이터 해상도는 의도된 설계 목표(예: 순수 예측 대 예측 결합 상태 감시)와의 정합성을 고려한 결정이어야 합니다. 고해상도 데이터는 저장 공간 및 재학습 시 처리 시간 증가를 유발하지만, 미세한 이상 징후 감지를 통해 예측 유지보수 측면을 강화할 수 있습니다.[6]</li>
+                    <li class="checklist-item"><strong>데이터 유효성 검사 및 품질 관리(QC) 메커니즘:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li><strong>완전성:</strong> 결측 데이터 존재 여부를 확인하고, 결측치 처리 절차(예: 평균/중앙값/최빈값 대체, XGBoost/LightGBM과 같은 고급 기법 활용, 또는 경우에 따른 삭제 [7])의 적절성을 평가합니다.</li>
+                            <li><strong>정확성 및 타당성:</strong> 데이터 값의 범위 검사, 이상치 탐지(예: Z-점수, IQR, Isolation Forest, DBSCAN [7, 8]), 그리고 데이터 간 일관성 검사(예: 풍속 대비 발전량, 터빈 상태 고려)를 수행하는지 확인합니다. 통계적 접근법 및 3σ-중앙값 방법을 통한 비정상 데이터 식별도 고려될 수 있습니다.[9]</li>
+                            <li><strong>타임스탬프 정확성 및 동기화:</strong> 모든 SCADA 데이터에 정확한 타임스탬프가 기록되고, 특히 다수 터빈으로부터 데이터를 수집할 경우 시간 동기화가 보장되는지 확인합니다. 시간 참조(표준시간대, UTC)의 중요성이 강조됩니다.[3]</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>전처리 단계:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li><strong>이상치 처리:</strong> 식별된 이상치를 어떻게 처리하는지(제거, 상/하한값 대체, 대체 [7]) 확인합니다.</li>
+                            <li><strong>노이즈 감소:</strong> 데이터에 노이즈가 많을 경우 이동 평균 등 필터링 기법 적용 여부를 확인합니다.[10]</li>
+                            <li><strong>데이터 변환/정규화:</strong> 머신러닝 모델 요구사항에 따라 피처 스케일링 또는 정규화(예: 최소-최대 스케일링, 표준화 [11])를 수행하는지 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>터빈 상태/이벤트 처리:</strong> 터빈 가동 중단, 유지보수, 출력 제한(curtailment) 기간을 시스템이 어떻게 처리하는지 평가합니다. 이러한 이벤트는 발전량에 큰 영향을 미치며, 적절히 처리되지 않으면 모델 학습을 왜곡시킬 수 있습니다.[12, 13] 출력 제한 데이터는 통상적인 회귀 분석으로 모델링하기 어려운 함수적 요소로 나타나며, 전처리 과정에서 제거되기도 합니다.[13] 시스템은 이에 대한 명확한 처리 전략을 가져야 합니다.</li>
+                </ul>
+                <p class="text-sm italic my-3">SCADA 데이터 해상도의 선택은 모델 성능, 저장 비용, 처리 시간, 이상 징후 탐지 복잡성에 영향을 미칩니다. 고해상도 데이터는 빠른 결함 감지를 가능하게 하지만 [6] MLOps 파이프라인에 부담을 줄 수 있습니다. 선택된 해상도가 시스템 목표에 부합하는지 평가해야 합니다.</p>
+                <p class="text-sm italic my-3">터빈 운영 상태(출력 제한, 유지보수, 결함) 처리 전략은 모델 견고성의 지표입니다. 단순 필터링 [13]은 실제 운영 조건을 반영하지 못할 수 있습니다. 정교한 시스템은 상태 플래그를 사용하거나 상태별 모델을 개발할 수 있습니다.</p>
+                <p class="text-sm italic my-3">SCADA 데이터 표준화 부족 [4]은 확장성에 도전 과제가 될 수 있습니다. 다양한 데이터 스키마에 유연하게 적응할 수 있는 데이터 수집 및 전처리 모듈이 필요합니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">B. 기상 예보 데이터: 소싱, 통합 및 관련성</h3>
+                <p class="mb-3">기상 예보 데이터는 풍력 발전량 예측의 또 다른 중요한 입력 요소입니다. 이 데이터의 출처, 품질, 그리고 시스템 통합 방식은 예측 정확도에 큰 영향을 미칩니다.</p>
+                 <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>데이터 출처 및 신뢰성:</strong> 수치 예보 모델(NWP) 데이터 제공처를 식별하고, 해당 기관의 평판, 예보 정확도, 업데이트 주기, 데이터 전달 메커니즘을 평가합니다.[14, 15]</li>
+                    <li class="checklist-item"><strong>핵심 기상 파라미터:</strong> 필수 파라미터(여러 고도, 특히 허브 높이 및 로터 회전 면적 전체의 풍속 및 풍향, 온도, 대기압, 습도 [1, 12, 14, 15, 16]) 수집 여부를 확인합니다. 지표면 근처 측정값보다는 측정 높이에서의 검증이 중요하며, 외삽된 높이에서의 검증은 권장되지 않습니다.[17]</li>
+                    <li class="checklist-item"><strong>공간 해상도 및 관련성:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>NWP 데이터의 공간 해상도가 풍력 발전 단지 위치에 적합한지 확인합니다. 특정 지점 예보인지, 광역 예보인지 파악해야 합니다. 무료 기상 서비스 예보는 보통 광역 예보인 경우가 많습니다.[1] 발전기 위치의 데이터를 사용하거나, 근접 지역 데이터의 경우 공간 보간법을 활용하는 것이 좋습니다.[18] 측정-상관-예측(MCP) 기법을 사용한 데이터 이식도 고려될 수 있습니다.[19]</li>
+                            <li>NWP 모델의 격자점 예보를 특정 터빈 위치 또는 풍력 발전 단지 전체에 어떻게 매핑하는지 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>시간 해상도 및 예측 시간 범위:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>NWP 예보 주기(예: 매시간, 3시간 간격) 및 예측 시간 범위(예: 24시간, 48시간, 72시간 전)가 시스템 요구사항과 일치하는지 확인합니다.[15, 16] 다양한 운영 결정에 따라 각기 다른 예측 시간 범위가 활용됩니다.[15]</li>
+                            <li>SCADA 데이터 주기와 NWP 예보 주기 간의 불일치 처리 방법(예: 보간, 집계)을 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>데이터 통합 및 동기화:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>NWP 데이터와 SCADA 데이터의 원활한 통합 여부를 검증합니다.</li>
+                            <li>예보 발행 시간, 유효 시간, SCADA 타임스탬프 간의 정확한 시간 정렬을 보장하는지 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>편향 보정/후처리:</strong> 시스템 내부 기상 예측 모델에 입력되기 전, 원시 NWP 모델 출력의 시스템적 편향을 보정하기 위한 방법(예: [20, 21])이 사용되는지 확인합니다. NWP 데이터는 내재적 편향을 포함할 수 있습니다.[21]</li>
+                </ul>
+                <p class="text-sm italic my-3">시스템 내부 "기상 예측 모델"은 NWP 데이터를 개선하거나 SCADA 측정값으로 보정할 가능성이 높습니다. 이 내부 모델의 부가 가치와 비용을 신중히 평가해야 합니다.[14, 20]</p>
+                <p class="text-sm italic my-3">NWP 파라미터 선택, 공간/시간 해상도는 모델 복잡성과 정확도에 영향을 미칩니다. 저해상도 NWP 데이터는 오차를 유발할 수 있습니다.[1, 18] NWP 출처의 적합성 또는 다운스케일링 기법 사용 여부를 확인해야 합니다.[19]</p>
+                <p class="text-sm italic my-3">외부 NWP 제공업체의 변경에 대한 시스템 대응 전략은 운영 안정성에 중요합니다. 데이터 형식, 해상도 변경 등에 견고하게 대응하거나 유지보수 계획이 있어야 합니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">C. 데이터 저장, 거버넌스 및 접근성</h3>
+                <p class="mb-3">수집되고 처리된 데이터의 효과적인 저장, 관리 및 접근성은 시스템의 장기적인 운영과 유지보수의 핵심입니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>데이터베이스 설계 및 기술:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>데이터베이스가 시계열 데이터에 최적화되어 있는지 확인합니다.[4]</li>
+                            <li>재학습 및 분석에 필요한 대규모 과거 데이터셋의 효율적인 조회를 지원하는지 확인합니다.[4, 22] SQL Server, Access, Oracle 등이 언급된 바 있습니다.[22]</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>데이터 보존 정책:</strong> SCADA 및 기상 데이터(원시 및 처리 데이터) 보존 기간에 대한 명확한 정책이 있는지 확인합니다. 이는 재학습 능력과 과거 성능 분석에 영향을 미칩니다.</li>
+                    <li class="checklist-item"><strong>데이터 거버넌스 및 품질 보증:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>데이터 품질 책임 주체가 명확한지, 데이터베이스 또는 데이터 파이프라인 내에 자동화된 QC 검사가 있는지 확인합니다.[3, 23] 센서 교정, 종단 간 점검, 데이터 레이블, 단위, 메타데이터의 중요성이 강조됩니다.[3]</li>
+                            <li>특히 처리된 데이터 및 모델 학습 세트에 대한 데이터 계보(lineage) 및 버전 관리가 추적되는지 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>API 접근 (해당되는 경우):</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>시스템이 API를 통해 데이터 또는 예측을 제공하는 경우("발전량 예측 Open-API 개발" 언급 [24]), 해당 API가 잘 문서화되고, 안전하며, 견고한지 확인합니다.</li>
+                            <li>버전 관리 및 호출량 제한(rate limiting)을 처리하는지 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>규정 준수 및 보안:</strong> 데이터 저장 및 접근이 관련 데이터 개인 정보 보호 및 보안 규정(예: 해당되는 경우 GDPR, 데이터 민감도)을 준수하는지 확인합니다. SCADA 데이터의 기밀성이 언급된 바 있습니다.[2] 웹 애플리케이션 보안 지침도 고려해야 합니다.[25]</li>
+                </ul>
+                <p class="text-sm italic my-3">"발전량 예측 Open-API 개발" [24] 언급은 API 신뢰성, 보안, 문서화, 버전 관리 요구사항을 높입니다. API 특화 테스트가 필요합니다.</p>
+                <p class="text-sm italic my-3">메타데이터 관리 [3]는 자동화된 재학습 시스템의 유지보수성과 신뢰성의 기초입니다. 우수한 메타데이터는 문제 진단, 데이터 변화 이해, 실험 재현성에 중요합니다.[26, 27]</p>
+
+                <h4 class="text-lg font-semibold mt-6 mb-3">표 1: 핵심 SCADA 및 기상 데이터 파라미터 검증</h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>파라미터 명칭</th>
+                                <th>출처 (SCADA/기상예보/내부기상모델)</th>
+                                <th>일반 단위</th>
+                                <th>수집 주기/해상도</th>
+                                <th>기상 모델 중요도</th>
+                                <th>발전량 모델 중요도</th>
+                                <th>핵심 품질 점검 항목</th>
+                                <th>관련 근거 자료</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>유효 발전량</td><td>SCADA</td><td>kW</td><td>10분</td><td>낮음</td><td>매우 높음</td><td>결측치, 이상치 (0 미만 또는 정격 초과), 급변동</td><td>[1, 3]</td></tr>
+                            <tr><td>로터 회전 속도</td><td>SCADA</td><td>RPM</td><td>10분</td><td>낮음</td><td>높음</td><td>결측치, 물리적 한계 초과</td><td>[1, 4]</td></tr>
+                            <tr><td>실제 풍속 (나셀)</td><td>SCADA</td><td>m/s</td><td>10분</td><td>중간</td><td>높음</td><td>결측치, 이상치, 타 풍속계 데이터와 비교</td><td>[1, 3]</td></tr>
+                            <tr><td>풍향 (나셀)</td><td>SCADA</td><td>°</td><td>10분</td><td>중간</td><td>높음</td><td>결측치, 0-360 범위, 급변동</td><td>[1, 3]</td></tr>
+                            <tr><td>터빈 상태 코드</td><td>SCADA</td><td>코드</td><td>10분</td><td>낮음</td><td>매우 높음</td><td>결측치, 정의되지 않은 코드, 이벤트와 발전량 일치 여부</td><td>[3, 12]</td></tr>
+                            <tr><td>기어박스 베어링 온도</td><td>SCADA</td><td>°C</td><td>10분</td><td>낮음</td><td>중간</td><td>결측치, 정상 작동 범위 초과</td><td>[3, 6]</td></tr>
+                            <tr><td>주변 온도 (나셀)</td><td>SCADA</td><td>°C</td><td>10분</td><td>높음</td><td>중간</td><td>결측치, 기상예보 온도와 비교</td><td>[3]</td></tr>
+                            <tr><td>NWP 풍속 (허브높이)</td><td>기상예보</td><td>m/s</td><td>1시간/3시간</td><td>매우 높음</td><td>(내부모델 입력)</td><td>지연시간, 결측치, 과거 관측값과의 편차</td><td>[14, 15]</td></tr>
+                            <tr><td>NWP 풍향 (허브높이)</td><td>기상예보</td><td>°</td><td>1시간/3시간</td><td>매우 높음</td><td>(내부모델 입력)</td><td>지연시간, 결측치, 과거 관측값과의 편차</td><td>[14, 15]</td></tr>
+                            <tr><td>NWP 온도</td><td>기상예보</td><td>°C</td><td>1시간/3시간</td><td>높음</td><td>(내부모델 입력)</td><td>지연시간, 결측치</td><td>[14, 15]</td></tr>
+                            <tr><td>NWP 대기압</td><td>기상예보</td><td>hPa</td><td>1시간/3시간</td><td>중간</td><td>(내부모델 입력)</td><td>지연시간, 결측치</td><td>[14, 15]</td></tr>
+                            <tr><td>내부모델 예측 풍속</td><td>내부기상모델</td><td>m/s</td><td>10분/1시간</td><td>(발전량모델 입력)</td><td>매우 높음</td><td>NWP 대비 개선도, SCADA 실제풍속과의 오차</td><td></td></tr>
+                            <tr><td>내부모델 예측 풍향</td><td>내부기상모델</td><td>°</td><td>10분/1시간</td><td>(발전량모델 입력)</td><td>높음</td><td>NWP 대비 개선도, SCADA 실제풍향과의 오차</td><td></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-sm italic mt-3">이 표는 2단계 모델링 프로세스를 고려하여 두 모델 모두에 필요한 모든 입력이 존재하고 고품질인지 체계적으로 검증하는 데 도움을 줍니다. 각 데이터 포인트, 출처, 역할을 상세히 검토하고, 품질 점검 항목 및 근거 자료와 연결하여 증거 기반 검증을 지원합니다.</p>
+            </div>
+        </section>
+
+        <section id="prediction-modeling" class="scroll-mt-20 mb-10">
+            <h2 class="text-2xl font-semibold border-b-2 border-[#B08D57] pb-2 mb-4">II. 예측 모델링 엔진: 정확성 및 신뢰성</h2>
+            <div class="content-card">
+                <p class="section-intro">본 섹션에서는 시스템의 핵심인 예측 모델 자체를 심층적으로 분석합니다. 기상 예측 모델과 발전량 예측 모델 각각의 설계, 성능 평가, 그리고 사용된 특정 기술들을 평가합니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">A. 기상 예측 모델: 설계 및 성능 평가</h3>
+                <p class="mb-3">시스템은 외부 기상 예보 데이터를 입력받아 자체적인 기상 예측 모델을 통해 정제된 기상 정보를 생성합니다. 이 내부 기상 예측 모델의 성능은 후속 발전량 예측 모델의 정확도에 직접적인 영향을 미치므로, 면밀한 검토가 필요합니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>모델 유형 및 아키텍처:</strong> 사용된 특정 ML/통계 모델(예: NWP 보정 하이브리드 모델 [20, 28], 또는 [19, 29, 30, 31] 언급 모델)을 식별합니다. 물리, 통계, ML, 하이브리드 모델인지 구분합니다.[15]</li>
+                    <li class="checklist-item"><strong>입력 피처:</strong> 특정 기상 예보 데이터(예: 다양한 기압 고도 풍속/풍향, 온도, 습도 [14, 15])와 잠재적 SCADA 데이터(현지 온도, 기압 등) 사용 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>출력 변수:</strong> 정확한 출력 변수(예: 허브 높이 정제 풍속, 풍향, 현장 온도)를 명시합니다. 풍속 출력이 정확도 향상에 기여할 수 있습니다.[29]</li>
+                    <li class="checklist-item"><strong>공간 및 시간적 측면:</strong> 모델이 풍력 단지 공간적 변동성 및 시간적 종속성 처리 방식을 확인합니다. 인접 관측소 데이터 통합이 정확도 향상에 기여할 수 있습니다.[30]</li>
+                    <li class="checklist-item"><strong>성능 지표:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>기상 예보 정확도 평가 방식 (풍속: MAE, RMSE, NMAE, NRMSE [16, 32, 33]; 풍향: 풍향 MAE, 벡터 상관 계수 [31])을 확인합니다.</li>
+                            <li>예측 결과가 원시 NWP 또는 지속성 예보와 비교 벤치마킹되는지 확인합니다.[11]</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>검증 전략:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>모델 검증 방법(교차 검증, 홀드아웃 테스트 세트)을 확인합니다.</li>
+                            <li>실제 현장 기상 측정 데이터(기상 관측탑, 라이다 [17]) 기준 검증 여부 (권장 [17])를 확인합니다.</li>
+                            <li>검증 시 특정 대기 조건(안정/불안정, 계절, 일주기, 극한 기상 [17]) 고려 여부를 확인합니다.</li>
+                        </ul>
+                    </li>
+                </ul>
+                <p class="text-sm italic my-3">내부 기상 예측 모델 성능은 발전량 예측 모델 입력 품질을 결정합니다. 실제 지상 실측 데이터 기반의 엄격하고 독립적인 검증이 중요합니다.</p>
+                <p class="text-sm italic my-3">기상 모델 출력 피처 선택은 정확도와 물리적 현실성 포착 능력에 영향을 미칩니다.[29] 핵심 변수 직접 예측이 더 견고할 수 있습니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">B. 발전량 예측 모델: 설계 및 성능 평가</h3>
+                <p class="mb-3">정제된 기상 예보와 SCADA 데이터를 입력으로 받아 최종적인 발전량을 예측하는 모델은 시스템의 핵심 출력물을 생성합니다. 이 모델의 설계, 입력 피처 활용, 성능 평가는 시스템의 실질적인 가치를 결정합니다.</p>
+                 <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>모델 유형 및 아키텍처:</strong> 사용된 특정 ML 모델(회귀, 신경망, SVM, 결정 트리, 앙상블, LSTM, CNN, GNN, 하이브리드 모델 등 [1, 2, 5, 12, 21, 24, 34-46])을 식별합니다.</li>
+                    <li class="checklist-item"><strong>입력 피처:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>내부 기상 모델의 정제된 기상 예보 사용 여부를 확인합니다.</li>
+                            <li>SCADA 데이터(현재/최근 발전량 [1], 로터 속도, 풍속, 풍향, 터빈 상태 등 [1, 40, 41]) 사용 여부를 확인합니다. 과거 발전량 데이터는 강력한 예측 변수입니다.[1]</li>
+                            <li>터빈별 특성(발전량 곡선 데이터, 연식, 유지보수 이력 [12, 13, 14, 37]) 통합 여부를 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>출력 변수:</strong> 특정 미래 시점 예측 발전량(kW/MW) 또는 에너지 단위를 확인합니다.[15]</li>
+                    <li class="checklist-item"><strong>다수 터빈/풍력 발전 단지 수준 처리:</strong> 개별 터빈 예측 후 집계 방식인지, 단지 수준 직접 예측 방식인지, 후류 효과 고려 여부(GNN 등 [5, 38, 45, 47])를 파악합니다.</li>
+                    <li class="checklist-item"><strong>성능 지표:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>표준 회귀 지표: MAE, RMSE, NMAE, NRMSE, MAPE.[11, 12, 16, 32, 33]</li>
+                            <li>R-제곱 (결정 계수).[32, 33]</li>
+                            <li>편향 (평균 편향 오차 - MBE).[21, 32]</li>
+                            <li>예측 스킬 점수 (지속성 등 기준선 대비).[11, 32]</li>
+                        </ul>
+                    </li>
+                     <li class="checklist-item"><strong>검증 전략:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>실제 SCADA 발전량 데이터에 대한 검증을 확인합니다.</li>
+                            <li>다양한 운영 조건(다양한 풍속, 계절, 시간대 [17])에 대한 평가를 확인합니다.</li>
+                            <li>오차 분포 분석(예: 고풍속/저풍속 또는 급변 구간에서 오차가 더 큰지)을 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>물리 정보 기반 접근/발전량 곡선 제약:</strong> 모델이 현실적 예측을 위해 터빈 이론적 발전량 곡선 등 물리적 제약 조건(정격 출력 초과 불가, 컷인 풍속 미만 발전량 0 등 [12, 13, 14, 37, 43, 44])을 통합하는지 확인합니다. PINN [43, 44] 등이 논의되었습니다.</li>
+                </ul>
+                <p class="text-sm italic my-3">정제된 기상 예측과 SCADA 데이터를 모두 사용하는 것은 모델이 실시간 터빈 거동 학습 및 잔여 오차 보정에 도움을 줍니다. 과거 발전량 데이터는 중요합니다.[1, 40]</p>
+                <p class="text-sm italic my-3">물리 정보 기반 제약 조건은 특히 분포 외 이벤트에 대한 신뢰성과 강건성에 중요합니다.[37, 43] 물리적으로 불가능한 예측을 방지합니다.</p>
+                <p class="text-sm italic my-3">단지 수준 예측 시 명시적인 후류 효과 모델링이 없으면 오차가 발생할 수 있습니다.[5, 46, 47] GNN [38, 45] 또는 단순화된 후류 모델 통합을 고려할 수 있습니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">C. 피처 엔지니어링 및 선택 전략</h3>
+                <p class="mb-3">입력 데이터로부터 유용한 정보를 추출하고 모델 성능을 최적화하기 위한 피처 엔지니어링 및 선택 전략은 모델의 성공에 결정적인 역할을 합니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>피처 생성:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>지연 변수(과거 풍속/발전량 [1, 40, 48, 49]) 효과적 사용 여부를 확인합니다.</li>
+                            <li>상호작용 항(풍속 * 공기 밀도) 생성 여부를 확인합니다.</li>
+                            <li>주기적 피처(시간대, 연중일)의 적절한 인코딩(사인/코사인 변환 [12, 48]) 여부를 확인합니다.</li>
+                            <li>도메인 지식 활용 관련 피처 생성([41, 48], 분해 알고리즘 [41]) 여부를 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>피처 선택:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>관련성 높은 피처 선택 및 다중공선성 회피 방법(필터, 래퍼, 임베디드, SHAP 값 [10, 35, 37, 41]) 사용 여부를 확인합니다. 피처 선택은 중요합니다.[35]</li>
+                            <li>모델 재학습 시 피처 세트 정기적 검토/업데이트 여부를 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>범주형 피처 처리:</strong> 범주형 데이터(터빈 상태, 풍향 구간) 인코딩 방식(원-핫 인코딩, 임베딩)을 확인합니다.</li>
+                    <li class="checklist-item"><strong>차원 축소:</strong> 고차원 피처 공간 시 차원 축소 기법(PCA [51]) 적절 사용 여부를 확인합니다.[50]</li>
+                </ul>
+                <p class="text-sm italic my-3">"주기적인 자동 학습"은 피처 관련성이 변할 수 있음을 시사합니다. 피처 선택 또한 동적이거나 주기적으로 검토되어야 합니다.[35, 52] 자동화된 피처 선택 또는 중요도 재평가(SHAP [10, 37]) 통합을 고려할 수 있습니다.</p>
+                <p class="text-sm italic my-3">풍향 엔지니어링은 중요합니다. 단순 숫자 값 처리는 순환성 문제(0°~360°)를 야기할 수 있습니다. U-V 성분 [31] 또는 사인/코사인 변환 사용은 신중한 설계의 표시입니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">D. 불확실성 처리 및 확률론적 예측</h3>
+                <p class="mb-3">예측의 불확실성을 정량화하고 전달하는 능력은 고급 예측 시스템의 중요한 특징입니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>점 예측 대 확률론적 예측:</strong> 시스템이 점 예측만 제공하는지, 아니면 확률론적 예측(예측 구간, 분위수, 전체 분포 [13, 15, 32, 34, 53])도 제공하는지 확인합니다.</li>
+                    <li class="checklist-item"><strong>불확실성 정량화:</strong> 확률론적 예측 시 불확실성 정량화 방법(앙상블, 분위수 회귀, 베이지안, GP 기반 분산 [13, 34, 53, 54])을 확인합니다.</li>
+                    <li class="checklist-item"><strong>확률론적 예측 평가:</strong> 해당 시 예측 구간 신뢰도/폭 평가 지표(PICP, PINAW, CWC [53]) 사용 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>불확실성 전달:</strong> 예측 불확실성이 대시보드를 통해 사용자에게 전달되는 방식(오차 범위, 시나리오)을 확인합니다.</li>
+                </ul>
+                <p class="text-sm italic my-3">확률론적 예측은 운영 가치를 크게 향상시키며 위험 인지 기반 의사결정을 가능하게 합니다.[13, 34, 53, 54] 점 예측만으로는 잠재적 결과 범위를 알 수 없습니다.</p>
+                <p class="text-sm italic my-3">불확실성 정량화 방법 선택은 계산 비용과 해석 가능성에 영향을 미칩니다. 앙상블은 계산 부하가 크고, LUBE 등은 더 효율적일 수 있습니다.[53, 54]</p>
+
+                <h4 class="text-lg font-semibold mt-6 mb-3">표 2: 예측 모델 성능 지표</h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>지표 범주</th>
+                                <th>특정 지표</th>
+                                <th>공식/정의</th>
+                                <th>해석 (좋은/나쁜 값)</th>
+                                <th>적용 가능성</th>
+                                <th>일반적 허용 범위/벤치마크</th>
+                                <th>관련 근거 자료</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>점 예측 정확도</td><td>MAE</td><td>$\frac{1}{N} \sum |y_i - \hat{y}_i|$</td><td>작을수록 좋음. 오차 평균 크기.</td><td>기상/발전량</td><td>모델/대상 따라 다름.</td><td>[16]</td></tr>
+                            <tr><td>점 예측 정확도</td><td>RMSE</td><td>$\sqrt{\frac{1}{N} \sum (y_i - \hat{y}_i)^2}$</td><td>작을수록 좋음. 큰 오차에 가중.</td><td>기상/발전량</td><td>MAE보다 크거나 같음.</td><td>[16]</td></tr>
+                            <tr><td>점 예측 정확도</td><td>NMAE</td><td>MAE / Normalization_Factor</td><td>작을수록 좋음. 스케일 독립 비교.</td><td>기상/발전량</td><td>%로 표현.</td><td>[16]</td></tr>
+                            <tr><td>점 예측 정확도</td><td>NRMSE</td><td>RMSE / Normalization_Factor</td><td>작을수록 좋음. 스케일 독립 비교.</td><td>기상/발전량</td><td>0-10% 우수, 10-20% 양호.</td><td>[16]</td></tr>
+                            <tr><td>점 예측 정확도</td><td>MAPE</td><td>$\frac{100%}{N} \sum |\frac{y_i - \hat{y}_i}{y_i}|$</td><td>작을수록 좋음. $y_i=0$ 근처에서 불안정.</td><td>발전량 (주로)</td><td>0-10% 매우 정확.</td><td>[16]</td></tr>
+                            <tr><td>점 예측 정확도</td><td>MBE</td><td>$\frac{1}{N} \sum (y_i - \hat{y}_i)$</td><td>0에 가까울수록 좋음. 편향 방향.</td><td>기상/발전량</td><td></td><td>[21, 32]</td></tr>
+                            <tr><td>점 예측 정확도</td><td>Skill Score</td><td>$1 - \frac{RMSE_{forecast}}{RMSE_{reference}}$</td><td>클수록 좋음 (1에 가깝게). 기준 대비 향상도.</td><td>기상/발전량</td><td>0보다 커야 의미.</td><td>[11, 32]</td></tr>
+                            <tr><td>확률론적 예측 품질</td><td>PICP</td><td>예측 구간 내 실제 관측치 포함 비율</td><td>명목 신뢰 수준에 가까울수록 좋음.</td><td>기상/발전량</td><td></td><td>[53]</td></tr>
+                            <tr><td>확률론적 예측 품질</td><td>PINAW</td><td>정규화된 예측 구간 평균 너비</td><td>작을수록 좋음. PICP와 함께 고려.</td><td>기상/발전량</td><td></td><td>[53]</td></tr>
+                            <tr><td>확률론적 예측 품질</td><td>CWC</td><td>PICP와 PINAW 결합 지표</td><td>작을수록 좋음. PICP 낮으면 페널티.</td><td>기상/발전량</td><td></td><td>[53]</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                 <p class="text-sm italic mt-3">이 표는 기상 및 발전량 예측 모델 평가를 위한 표준화된 프레임워크를 제공하며, 점 예측과 확률론적 예측 지표를 구분하여 포괄적 평가를 안내합니다. 산업 표준 또는 기준선 대비 벤치마킹을 장려합니다.</p>
+            </div>
+        </section>
+
+        <section id="mlops" class="scroll-mt-20 mb-10">
+            <h2 class="text-2xl font-semibold border-b-2 border-[#B08D57] pb-2 mb-4">III. MLOps 및 자동화: 예측 정확도 유지</h2>
+            <div class="content-card">
+                <p class="section-intro">본 섹션에서는 머신러닝 모델의 운영 측면, 특히 자동화된 재학습 파이프라인, 모델 관리 및 운영 환경 모니터링을 평가합니다. "잘 만들어진" 시스템은 배포 시점의 정확성뿐만 아니라 견고한 MLOps 관행을 통해 시간이 지나도 정확성을 유지해야 합니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">A. 자동화된 모델 재학습 파이프라인: 트리거, 검증 및 효과</h3>
+                <p class="mb-3">시스템은 주기적으로 자동 학습을 통해 예측 모델을 업데이트한다고 명시되어 있습니다. 이 자동화된 재학습 파이프라인의 효율성과 견고성은 장기적인 예측 성능 유지에 매우 중요합니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>재학습 주기/스케줄:</strong> 기상 및 발전량 모델 재학습 빈도 (고정/동적)를 확인합니다. [55]</li>
+                    <li class="checklist-item"><strong>재학습 트리거:</strong> 재학습 시작 요인 (시간 기반 [55], 성능 저하 [55, 56], 데이터/개념 드리프트 [52, 56], 새 데이터 가용성 [55, 57], 수동 실행 [55])을 확인합니다.</li>
+                    <li class="checklist-item"><strong>재학습에 사용되는 데이터:</strong> 새 학습 데이터셋 구성 방식 (전체 데이터, 슬라이딩 윈도우 [52, 58]) 및 새 데이터 전처리 일관성 적용 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>재학습 프로세스 검증:</strong> 새로 재학습된 모델 배포 전 검증 방식 (현재 모델과 비교, 섀도우 배포 [56, 59]) 및 모델 교체 기준 (홀드아웃 세트 지표 개선)을 확인합니다.</li>
+                    <li class="checklist-item"><strong>계산 자원 및 효율성:</strong> 재학습 프로세스의 계산 효율성 (허용 시간 내 완료, 타 시스템 영향 없음 [52, 58])을 확인합니다.</li>
+                    <li class="checklist-item"><strong>재학습 실패 처리:</strong> 재학습 실패 또는 새 모델 성능 저하 시 대응 (경고, 롤백 메커니즘)을 확인합니다.</li>
+                </ul>
+                 <div class="my-6">
+                    <h4 class="text-lg font-semibold text-center mb-2">그림 1: MLOps 재학습 트리거 유형별 효과 (가상)</h4>
+                    <div class="chart-container">
+                        <canvas id="retrainingTriggerChart"></canvas>
+                    </div>
+                    <p class="text-xs text-center mt-2 text-gray-600">성능 기반 또는 드리프트 기반 트리거가 자원 효율성과 모델 관련성 유지에 더 효과적일 수 있습니다.</p>
+                </div>
+                <p class="text-sm italic my-3">재학습 트리거 선택은 시스템 정교함을 반영합니다. 성능 모니터링 또는 드리프트 감지를 통합한 지능적 트리거가 이상적입니다.[52, 55, 56]</p>
+                <p class="text-sm italic my-3">재학습 데이터 선택 전략(증분, 확장 윈도우, 슬라이딩 윈도우 [52, 58])은 개념 드리프트 적응성, 안정성, 계산 비용에 영향을 미칩니다.</p>
+                <p class="text-sm italic my-3">새 모델 배포 전 견고한 검증(섀도우 배포 [56])이 없으면 운영 위험이 큽니다. `model_new`가 `model_current`보다 나은지 결정하는 자동화된 프로세스가 필요합니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">B. 모델 버전 관리, 배포 및 롤백 전략</h3>
+                <p class="mb-3">자동으로 업데이트되는 모델을 안정적으로 운영하기 위해서는 체계적인 버전 관리, 배포, 그리고 유사시를 대비한 롤백 전략이 필수적입니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>모델 버전 관리:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>모든 학습 모델(기상, 발전량) 버전 관리 및 모델 레지스트리(MLflow [26, 27, 60]) 저장 여부를 확인합니다.</li>
+                            <li>버전 관리에 모델 아티팩트, 학습 데이터 참조, 코드 버전, 성능 지표 포함 여부를 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>배포 전략:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>새 모델 운영 환경 배포 방식(블루-그린, 카나리, 롤링 업데이트 [26, 59])을 확인합니다.</li>
+                            <li>배포 프로세스 자동화 여부를 확인합니다.</li>
+                            <li>배포 전/후 상태 점검 여부를 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>롤백 기능:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>새 모델 문제 발생 시 이전 안정 버전 신속 롤백 절차(테스트 완료) 존재 여부를 확인합니다.[26]</li>
+                            <li>롤백 실행 속도를 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>환경 일관성:</strong> 학습 및 서비스 환경 일관성 유지(컨테이너화 사용 등 [61]) 여부를 확인합니다.</li>
+                </ul>
+                <p class="text-sm italic my-3">효과적인 모델 버전 관리는 재현성을 위해 코드, 데이터, 구성을 모델과 연결해야 합니다.[26, 27, 60, 61] MLflow, Kubeflow 같은 도구가 도움이 됩니다.</p>
+                <p class="text-sm italic my-3">배포 전략(카나리, 섀도우 [59])은 위험 완화와 속도 간 절충을 반영합니다. 중요한 시스템에는 신중한 접근이 선호됩니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">C. 운영 환경 모니터링: 데이터 파이프라인, 모델 성능 및 시스템 상태</h3>
+                <p class="mb-3">모델이 운영 환경에 배포된 후에는 지속적인 모니터링을 통해 성능을 유지하고 문제를 신속하게 감지해야 합니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>데이터 파이프라인 모니터링:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>SCADA/기상 데이터 수집 파이프라인 상태/성능 모니터링 메커니즘 존재 여부를 확인합니다.[62, 63]</li>
+                            <li>데이터 최신성, 볼륨, 완전성, 스키마 일관성 점검 여부를 확인합니다.[63]</li>
+                            <li>파이프라인 오류/심각한 데이터 지연 경고 존재 여부를 확인합니다.[62]</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>모델 성능 모니터링:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>배포된 모델 주요 성능 지표(표 2) 실시간/거의 실시간 추적 여부를 확인합니다.[13, 54, 56, 64]</li>
+                            <li>모델 드리프트(성능 저하) 모니터링 여부를 확인합니다.[52, 56]</li>
+                            <li>예측 잔차 패턴/편향 분석 여부를 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>데이터 드리프트 및 개념 드리프트 감지:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>입력 피처 통계적 속성 변화(데이터 드리프트 [52, 56]) 모니터링 여부를 확인합니다.</li>
+                            <li>입력 피처-목표 변수 관계 변화(개념 드리프트 [52]) 감지 메커니즘 존재 여부를 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>시스템 인프라 모니터링:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>서버 상태(CPU, 메모리, 디스크, 네트워크), DB 성능, API 응답 시간 모니터링 여부를 확인합니다.[65]</li>
+                            <li>웹 애플리케이션/대시보드 응답성 유지 여부를 확인합니다.</li>
+                        </ul>
+                    </li>
+                </ul>
+                <p class="text-sm italic my-3">모니터링은 모델 정확도, 데이터 파이프라인, 인프라를 포괄해야 합니다.[62, 63, 65] 어느 한 부분의 실패는 전체 시스템 마비로 이어질 수 있습니다.</p>
+                <p class="text-sm italic my-3">데이터/개념 드리프트 [52]의 사전 예방적 감지는 사후 대응적 성능 모니터링보다 발전된 방식입니다. 성능 저하 전 조기 개입을 가능하게 합니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">D. 로깅, 경고 및 사고 대응 메커니즘</h3>
+                <p class="mb-3">문제 발생 시 신속한 진단과 해결을 위해서는 효과적인 로깅, 경고 시스템, 그리고 명확한 사고 대응 절차가 필수적입니다.</p>
+                 <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>로깅 전략:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>모든 시스템 구성 요소(데이터 수집, 전처리, 모델 학습, 예측, API, 대시보드) 포괄적 로그 생성 여부를 확인합니다.</li>
+                            <li>로그 구조화(JSON 등 [66]) 및 충분한 컨텍스트(타임스탬프, 심각도, 소스, ID [66, 67]) 포함 여부를 확인합니다.</li>
+                            <li>로그 내 민감 정보 제외/마스킹 여부를 확인합니다.[66, 67]</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>경고 시스템:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>중요 이벤트(데이터 파이프라인 오류 [62], 모델 성능 저하 [55, 56, 66], 재학습 실패, 시스템 오류 [65], 보안 사고 [25, 67]) 경고 구성 여부를 확인합니다.</li>
+                            <li>경고 실행 가능성 및 적절한 담당자 전달 여부를 확인합니다.[68, 69]</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>사고 대응 계획:</strong> 경고/사고 처리 정의된 프로세스 및 책임자 명확성 여부를 확인합니다.</li>
+                </ul>
+                <p class="text-sm italic my-3">로깅 품질은 문제 진단/해결 능력에 직접 영향을 미칩니다. 구조화된 로그, 충분한 컨텍스트가 중요합니다.[66, 67]</p>
+                <p class="text-sm italic my-3">경고 전략은 계층화되고 상황 인지적이어야 합니다. 정보성, 경고성, 치명적 경고를 구분하고, 실행 불가능한 경고로 인한 피로를 방지해야 합니다.[66, 68]</p>
+
+                <h4 class="text-lg font-semibold mt-6 mb-3">표 3: 자동화된 재학습 및 모니터링을 위한 MLOps 체크리스트</h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>MLOps 측면</th>
+                                <th>체크포인트/모범 사례 질문</th>
+                                <th>바람직한 상태/구현 세부 정보</th>
+                                <th>중요성 근거</th>
+                                <th>관련 근거 자료</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>재학습 트리거 유형</td><td>재학습이 성능 저하, 데이터/개념 드리프트, 또는 고정된 스케줄에 의해 트리거되는가?</td><td>성능 기반 또는 드리프트 기반 트리거가 스케줄 기반보다 선호됨 (또는 혼합)</td><td>모델 관련성 및 효율적 자원 사용 유지</td><td>[52, 55, 56]</td></tr>
+                            <tr><td>새 모델 검증</td><td>새로 학습된 모델은 배포 전에 홀드아웃 데이터셋 및 현재 운영 모델과 비교 검증되는가?</td><td>A/B 테스트, 섀도우 배포 또는 강력한 오프라인 검증</td><td>잘못된 모델 배포로 인한 성능 저하 방지</td><td>[56, 59]</td></tr>
+                            <tr><td>모델 버전 관리 세부 정보</td><td>모델 버전 관리에 학습 데이터 해시/버전, 코드 버전, 하이퍼파라미터, 성능 지표가 포함되는가?</td><td>포괄적인 아티팩트 및 메타데이터 버전 관리</td><td>재현성, 디버깅, 감사 용이</td><td>[26, 27, 61]</td></tr>
+                            <tr><td>배포 전략</td><td>새 모델 배포 시 카나리, 블루-그린, 롤링 업데이트 등의 점진적 전략이 사용되는가?</td><td>카나리 또는 섀도우 배포 권장</td><td>배포 위험 최소화 및 신속한 롤백 가능</td><td>[59]</td></tr>
+                            <tr><td>데이터 파이프라인 모니터링 지표</td><td>데이터 최신성, 완전성, 볼륨, 스키마 일관성이 모니터링되는가?</td><td>핵심 지표에 대한 실시간 모니터링 및 임계값 기반 경고</td><td>모델 입력 데이터 품질 보장</td><td>[62, 63]</td></tr>
+                            <tr><td>모니터링되는 모델 성능 지표</td><td>주요 예측 정확도 지표(MAE, RMSE 등)가 운영 환경에서 실시간으로 추적되는가?</td><td>핵심 지표에 대한 지속적인 추적 및 성능 저하 시 경고</td><td>모델 성능 저하 조기 감지</td><td>[56, 64]</td></tr>
+                            <tr><td>드리프트 감지 방법</td><td>입력 데이터 분포 변화(데이터 드리프트) 또는 입력-출력 관계 변화(개념 드리프트)를 감지하는 메커니즘이 있는가?</td><td>통계적 테스트 또는 전용 드리프트 감지 도구 사용</td><td>모델 성능 저하의 근본 원인 파악 및 선제적 재학습 트리거</td><td>[52]</td></tr>
+                            <tr><td>로깅 수준/구조</td><td>로그가 JSON 등 구조화된 형식이며, 타임스탬프, 심각도, 소스, 요청 ID 등 충분한 컨텍스트를 포함하는가?</td><td>구조화된 로깅, 표준화된 필드</td><td>효율적인 문제 해결 및 분석</td><td>[66, 67]</td></tr>
+                            <tr><td>중요 경고 유형</td><td>데이터 파이프라인 실패, 모델 성능 임계값 위반, 재학습 실패, 시스템 오류 등에 대한 경고가 설정되어 있는가?</td><td>실행 가능한 경고를 적절한 팀/담당자에게 전달</td><td>중요 문제에 대한 신속한 인지 및 대응</td><td>[56, 62, 65]</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-sm italic mt-3">이 표는 자동 재학습 기능이 있는 시스템의 MLOps 관행 성숙도를 평가하는 구조화된 방법을 제공하며, 전체 수명 주기를 포괄하여 중요한 운영 측면이 간과되지 않도록 보장합니다.</p>
+            </div>
+        </section>
+
+        <section id="web-system" class="scroll-mt-20 mb-10">
+            <h2 class="text-2xl font-semibold border-b-2 border-[#B08D57] pb-2 mb-4">IV. 웹 시스템 및 대시보드: 기능성 및 사용자 경험</h2>
+            <div class="content-card">
+                <p class="section-intro">본 섹션에서는 시스템의 사용자 대면 구성 요소인 대시보드와 전체 웹 애플리케이션에 초점을 맞춥니다. "잘 만들어진" 시스템은 기술적으로 견고할 뿐만 아니라 사용 가능하고, 성능이 우수하며, 안전하고, 사용자에게 실행 가능한 통찰력을 제공해야 합니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">A. 대시보드 설계: 명확성, 상호작용성 및 실행 가능한 통찰력</h3>
+                <p class="mb-3">사용자 질의에 따르면 시스템의 초기 화면에는 관련 대시보드가 포함되어 있습니다. 이 대시보드는 시스템의 첫인상이자 핵심 정보를 전달하는 창구이므로, 그 설계가 매우 중요합니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>목적 및 대상 사용자:</strong> 대시보드 목적 명확성 [71, 72, 73] 및 의도된 사용자(운영자, 분석가, 관리자 [24, 74, 75]) 요구 부합 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>핵심 정보 표시:</strong> 가장 중요한 정보(현재 예측, 최근 실제값, 예측 정확도 KPI [72, 74, 75]) 명확 제시 및 좋은 시각적 계층 구조 [72, 75, 76] 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>데이터 시각화 선택:</strong> 시계열 데이터 적합 차트 유형(추세: 꺾은선, 비교: 막대형 [73, 74, 76]), 명확/간결한 시각화("차트정크" 회피 [73]), 불확실성 시각화(예측 구간 밴드 [53]) 방식을 확인합니다.</li>
+                    <li class="checklist-item"><strong>상호작용성 및 사용자 경험(UX):</strong> 사용자 뷰 사용자 정의/데이터 필터링(시간 범위, 터빈별 [72, 75, 77]), 드릴다운 기능 [72, 75, 77], 대시보드 반응성/직관적 탐색 [74, 75] 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>통찰력의 실행 가능성:</strong> 대시보드가 정보 기반 결정/필요 조치 지원 [71, 72, 73] 및 기술적 분석을 넘어 진단적/예측/처방적 통찰력 [71] 제공 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>성능:</strong> 대용량 데이터셋에서도 빠른 로드 및 부드러운 업데이트 [72, 73, 78, 79] 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>비교 기능:</strong> 예측 대 실제값, 현재 대 과거 성능 비교 용이성 [76] (오프셋 사용 등 [76])을 확인합니다.</li>
+                </ul>
+                 <div class="my-6">
+                    <h4 class="text-lg font-semibold text-center mb-2">그림 2: 대시보드 정보 유형별 사용자 중요도 (가상)</h4>
+                    <div class="chart-container">
+                        <canvas id="dashboardUserNeedsChart"></canvas>
+                    </div>
+                    <p class="text-xs text-center mt-2 text-gray-600">사용자 역할(예: 발전소 운영자)에 따라 필요한 정보와 그 중요도가 다를 수 있습니다.</p>
+                </div>
+                <p class="text-sm italic my-3">효과적인 예측 대시보드는 의사결정 지원 도구입니다. 사용자가 취해야 할 특정 조치에 의해 안내되어야 합니다.[71, 72, 73]</p>
+                <p class="text-sm italic my-3">확률론적 예측 제공 시, 대시보드가 불확실성을 시각화하고 상호작용할 수 있도록 하는 능력은 고급 사용자를 위한 핵심 차별점입니다.[53]</p>
+                <p class="text-sm italic my-3">"초기 화면" 대시보드는 시스템의 "정문"입니다. 명확성, 성능, 즉각적 가치 제안이 사용자 채택에 중요합니다.[74, 75]</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">B. 핵심 웹 시스템 품질 속성: 성능, 보안, 신뢰성 및 확장성</h3>
+                <p class="mb-3">웹 시스템의 전반적인 품질은 모델 정확도만큼이나 중요합니다. 시스템의 성능, 보안, 신뢰성, 확장성은 사용자의 만족도와 시스템의 장기적인 생존 가능성을 결정합니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>성능:</strong> 웹 페이지 로드 시간, 대시보드 렌더링 속도, API 응답 시간 [78, 79, 80], 데이터 쿼리 효율성 [78, 79], 동시 사용자 부하 시 동작을 확인합니다.</li>
+                    <li class="checklist-item"><strong>보안:</strong> 인증/권한 부여 [25], 웹 취약점(OWASP Top Ten [25]) 보호, 데이터 암호화(전송 중/저장 시 [25]), API 보안, 정기 보안 감사/패치 [25] 적용 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>신뢰성 및 가용성:</strong> 시스템 가동 시간/가용성("나인" 목표 [81, 82]), 내결함성/점진적 성능 저하, 데이터 백업/복구 절차 [82], 사용자 오류 처리/보고를 확인합니다.</li>
+                    <li class="checklist-item"><strong>확장성:</strong> 증가하는 데이터 볼륨(터빈 수, 이력 [83])/사용자 수/API 요청 처리 능력 [83], ML 모델 학습/서비스 인프라 확장성 [27, 83], 확장 가능한 기술 사용(마이크로서비스, 클라우드 자동 확장 [83, 84]) 여부를 확인합니다.</li>
+                </ul>
+                <p class="text-sm italic my-3">확장성은 MLOps 프로세스 확장성도 포함합니다. 재학습 파이프라인은 터빈 수나 모델 복잡성 증가에 효율적으로 확장되어야 합니다.[27, 83]</p>
+                <p class="text-sm italic my-3">예측 시스템 신뢰성은 예측 자체의 일관성과 신뢰성으로 확장됩니다. 불안정한 재학습이나 데이터 문제로 모델 성능이 불규칙하면 사용자 관점에서 신뢰할 수 없습니다.[80, 81, 82]</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">C. 유지보수성 및 문서화</h3>
+                <p class="mb-3">시스템의 장기적인 운영과 발전을 위해서는 유지보수가 용이해야 하며, 관련 정보가 잘 문서화되어 있어야 합니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>코드 품질 및 모듈성:</strong> 코드베이스 구조화/모듈성/이해 용이성 [61, 80], 코딩 표준 준수 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>시스템 문서화:</strong> 사용자 문서(대시보드 사용, 예측 해석 [85]), 개발자/유지보수 담당자 기술 문서(아키텍처, 데이터 스키마, API, 모델, MLOps 절차 [61, 85, 86]), ML 실험/모델 버전/설계 근거 문서화 [61, 86] 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>업데이트 및 버그 수정 용이성:</strong> 시스템 구성 요소 업데이트/버그 수정/새 기능 도입 용이성 [80]을 확인합니다.</li>
+                    <li class="checklist-item"><strong>테스트 용이성:</strong> 테스트 용이성 설계 및 자동화된 테스트(단위, 통합, 종단 간 [61, 87, 88]) 존재 여부를 확인합니다.</li>
+                </ul>
+                <p class="text-sm italic my-3">ML 기반 시스템 문서는 소프트웨어 구성 요소뿐 아니라 데이터와 모델(데이터 사전, 피처 엔지니어링 로직, 모델 가정/한계 등)도 상세히 다루어야 합니다.[85, 86]</p>
+                <p class="text-sm italic my-3">유지보수성은 MLOps 프레임워크와 밀접하게 관련됩니다. 잘 설계된 MLOps 파이프라인(자동화, 버전 관리, 모니터링)은 ML 구성 요소 유지보수성을 향상시킵니다.[61]</p>
+
+                <h4 class="text-lg font-semibold mt-6 mb-3">표 4: 대시보드 사용성 및 효과성 체크리스트</h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>대시보드 측면</th>
+                                <th>평가 질문</th>
+                                <th>바람직한 상태/모범 사례 예시</th>
+                                <th>사용자 영향 (미흡 시)</th>
+                                <th>관련 근거 자료</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>핵심 지표 명확성</td><td>가장 중요한 상위 3개 예측 지표가 즉시 보이고 이해하기 쉬운가?</td><td>주요 KPI가 대시보드 상단 또는 눈에 잘 띄는 위치에 명확한 레이블과 함께 표시됨.</td><td>사용자가 핵심 정보를 빠르게 파악하기 어려워 의사결정 지연.</td><td>[72, 74, 75]</td></tr>
+                            <tr><td>차트 가독성</td><td>차트(꺾은선, 막대 등)가 명확하고, 축 레이블, 범례가 이해하기 쉬우며, 불필요한 장식이 없는가?</td><td>적절한 차트 유형 선택, 충분한 여백, 일관된 색상 사용, "차트정크" 최소화.</td><td>데이터 해석 오류 가능성 증가, 정보 전달 효율 저하.</td><td>[73, 76]</td></tr>
+                            <tr><td>상호작용성 - 필터링</td><td>사용자가 시간 범위, 터빈, 또는 기타 관련 기준으로 데이터를 필터링할 수 있는가?</td><td>직관적인 필터 컨트롤(드롭다운, 슬라이더 등) 제공.</td><td>특정 조건에 대한 분석 불가, 사용자 맞춤형 정보 획득 어려움.</td><td>[72, 77]</td></tr>
+                            <tr><td>상호작용성 - 드릴다운</td><td>사용자가 요약된 정보에서 더 상세한 데이터로 드릴다운할 수 있는가?</td><td>차트 요소 클릭 시 관련 세부 정보 표시 또는 다른 뷰로 이동.</td><td>문제의 근본 원인 파악 또는 심층 분석 제한.</td><td>[72, 77]</td></tr>
+                            <tr><td>데이터-잉크 비율</td><td>시각화에서 실제 데이터를 표현하는 데 사용된 잉크(픽셀)의 비율이 높은가?</td><td>장식적 요소, 3D 효과, 과도한 격자선 등 지양.</td><td>정보 과부하, 핵심 메시지 전달 방해.</td><td>[73]</td></tr>
+                            <tr><td>로드 시간</td><td>대시보드가 합리적인 시간 내에 로드되고, 필터링 등 상호작용 시 빠르게 반응하는가?</td><td>데이터 쿼리 최적화, 효율적인 렌더링 기술 사용.</td><td>사용자 불만 증가, 시스템 사용 기피.</td><td>[72, 78]</td></tr>
+                            <tr><td>실행 가능성</td><td>대시보드 정보가 사용자의 특정 행동이나 의사결정을 지원하는가?</td><td>예측 정확도, 편향 추세, 이상 상황 알림 등을 통해 조치 필요성 암시.</td><td>정보는 있으나 실제 활용으로 이어지지 않음.</td><td>[71, 73]</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4 class="text-lg font-semibold mt-6 mb-3">표 5: 핵심 웹 시스템 품질 속성 평가</h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>품질 속성</th>
+                                <th>주요 평가 기준/질문</th>
+                                <th>예시 테스트/검증 방법</th>
+                                <th>목표/벤치마크</th>
+                                <th>관련 근거 자료</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>성능</td><td>X 동시 요청 시 평균 API 응답 시간은? 대시보드 초기 로드 시간은 2초 이내인가?</td><td>부하 테스트 도구 사용, 브라우저 개발자 도구</td><td>API 응답 < 500ms, 대시보드 로드 < 2s</td><td>[78, 80]</td></tr>
+                            <tr><td>보안</td><td>SCADA 데이터는 저장 시 암호화되는가? 웹 애플리케이션은 OWASP Top 10에 안전한가?</td><td>DB 암호화 설정 확인, SAST/DAST 수행</td><td>AES-256 암호화, 주요 웹 취약점 없음</td><td>[25]</td></tr>
+                            <tr><td>신뢰성/가용성</td><td>문서화된 가동 시간 SLA는 무엇이며, 이를 충족하는가? 백업/복구 절차가 테스트되었는가?</td><td>가동 시간 모니터링, 백업/복구 시나리오 테스트</td><td>99.9% 가동 시간, RTO < 4시간</td><td>[81, 82]</td></tr>
+                            <tr><td>확장성</td><td>데이터 볼륨 2배 증가 시 재학습 파이프라인 처리 가능? 사용자 5배 증가 시 응답성 유지?</td><td>데이터/사용자 부하 증가 시나리오 테스트</td><td>재학습 시간 선형 증가 이하, 성능 저하 미미</td><td>[27, 83]</td></tr>
+                            <tr><td>유지보수성</td><td>새 피처 추가/버그 수정 평균 소요 시간? 코드 커버리지 80% 이상?</td><td>가상 변경 요청 개발 시간 추정, 커버리지 도구</td><td>주요 변경 1주 이내, 커버리지 > 80%</td><td>[61, 80]</td></tr>
+                            <tr><td>문서화</td><td>모델 학습 과정 재현성 위해 문서화? API 사양 최신 상태?</td><td>문서 검토, 주요 프로세스 재현 시도</td><td>ML 실험/모델 버전 상세 기록, API 문서 자동 생성/검증</td><td>[85, 86]</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-sm italic mt-3">이 표들은 최종 사용자 경험과 비기능적 요구사항에 중점을 두어, 모델 정확도를 넘어선 중요한 측면들이 철저히 평가되도록 보장합니다.</p>
+            </div>
+        </section>
+
+        <section id="overall-verification" class="scroll-mt-20 mb-10">
+            <h2 class="text-2xl font-semibold border-b-2 border-[#B08D57] pb-2 mb-4">V. 전체 시스템 검증 및 미래 대비</h2>
+            <div class="content-card">
+                <p class="section-intro">본 마지막 섹션에서는 시스템의 전체적인 검증, 광범위한 산업 관행 준수 여부, 그리고 향후 개선 가능성을 고려합니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">A. 종단 간 테스트 및 스트레스 사례 분석</h3>
+                <p class="mb-3">시스템의 각 구성 요소가 개별적으로 잘 작동하더라도, 전체 워크플로우가 원활하게 연동되는지, 그리고 예기치 않은 상황에 어떻게 대처하는지 검증하는 것은 매우 중요합니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>종단 간(E2E) 파이프라인 테스트:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                             <li>데이터 수집부터 예측, 대시보드 표시/API 출력까지 전체 워크플로우 시뮬레이션 테스트 존재 여부를 확인합니다.[87, 88]</li>
+                             <li>테스트에 현실적인(합성/마스킹 가능) 데이터 사용 여부를 확인합니다.[87]</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>시나리오 기반 스트레스 테스트:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>극한/특이 조건(SCADA 데이터 손실/손상, 기상 예보 지연/누락, 극한 기상 현상 [17], 높은 사용자 부하)에서 시스템 작동 방식을 확인합니다.[90, 91]</li>
+                            <li>시스템 점진적 성능 저하 또는 치명적 실패 여부, 사용자 문제 통보 방식을 확인합니다.</li>
+                        </ul>
+                    </li>
+                    <li class="checklist-item"><strong>적대적 입력에 대한 모델 견고성(해당/실행 가능한 경우):</strong> 조작된 입력으로 부정확/편향된 예측 생성 가능성 고려합니다.</li>
+                </ul>
+                <p class="text-sm italic my-3">복잡한 시스템의 종단 간 테스트는 오류 지점 격리에 중요합니다.[87] 여러 데이터 소스, 두 ML 모델, 자동 재학습, 웹 인터페이스를 포함합니다.</p>
+                <p class="text-sm italic my-3">스트레스 테스트는 시스템 "접합부" 또는 의존성(외부 NWP 인터페이스, 모델 간 전달, 재학습 트리거)을 목표로 해야 합니다.[90, 91] 이는 아키텍처 약점을 드러낼 수 있습니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">B. 산업 모범 사례 및 표준 준수</h3>
+                <p class="mb-3">시스템이 해당 분야의 확립된 모범 사례와 표준을 얼마나 잘 따르고 있는지는 시스템의 품질과 성숙도를 나타내는 중요한 지표입니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>데이터 관리:</strong> 가능한 경우 SCADA 데이터 IEC61400-25 등 표준 준수 여부를 확인합니다.[3, 4]</li>
+                    <li class="checklist-item"><strong>ML 개발:</strong> MLOps 모범 사례 준수(섹션 III), 확립된 ML 프레임워크/라이브러리 사용 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>소프트웨어 공학:</strong> 일반적인 SW 개발 모범 사례(코딩 표준, 버전 관리, 테스트, CI/CD [26, 55, 61]) 준수 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>보안:</strong> 웹 애플리케이션 보안 모범 사례(OWASP [25]) 준수 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>풍력 발전 예측 특수 사항:</strong>
+                        <ul class="list-disc pl-6 mt-1 space-y-1">
+                            <li>풍력 에너지 분야 일반적 평가 지표/검증 접근 방식 사용 여부를 확인합니다.[16, 17, 32, 33, 53]</li>
+                            <li>풍력 예측 일반적 문제점(간헐성, 데이터 품질, NWP 편향 [1, 9, 19, 21, 92, 93]) 인식 여부를 확인합니다.</li>
+                        </ul>
+                    </li>
+                </ul>
+                <p class="text-sm italic my-3">IEC61400-25 등 표준 준수는 어려울 수 있으나 [4], 관련 원칙 통합은 성숙도와 상호 운용성을 나타냅니다.[3] 향후 통합/마이그레이션을 용이하게 합니다.</p>
+                <p class="text-sm italic my-3">시스템 개발은 풍력 에너지 "주요 과제"(대기 모델링, 터빈-대기 상호작용, 실시간 데이터 활용 [92]) 이해를 반영해야 합니다. 시스템 설계가 이러한 과제 해결에 기여하는지 평가합니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">C. 고급 방법론 및 지속적 개선 가능성</h3>
+                <p class="mb-3">현재 시스템의 완성도도 중요하지만, 미래 기술 발전에 대한 대비와 지속적인 개선 의지는 시스템의 장기적인 가치를 결정합니다.</p>
+                <ul class="space-y-2 mb-4">
+                    <li class="checklist-item"><strong>고급 모델 탐색:</strong> 현재 모델 한계 도달 시 더 발전된 ML 기법(PINN [37, 43, 44, 46, 94, 95], GNN [12, 38, 45, 46], 앙상블 [38, 39, 54], 하이브리드 [20, 28, 34, 35, 54]) 고려/계획 증거를 확인합니다.</li>
+                    <li class="checklist-item"><strong>적응형 학습:</strong> 주기적 재학습 외 지속적/온라인 학습 기능 [34, 55] 존재 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>설명 가능성(XAI):</strong> 모델 예측 이해 도구/방법(SHAP 값 [12, 37, 39]) 사용 여부(디버깅, 신뢰 구축)를 확인합니다.</li>
+                    <li class="checklist-item"><strong>피드백 메커니즘:</strong> 사용자 피드백(예측 정확도, 대시보드 사용성) 수집 및 개선 추진 프로세스 존재 여부를 확인합니다.</li>
+                    <li class="checklist-item"><strong>연구 개발 문화:</strong> 팀/시스템의 풍력 예측/ML 새로운 연구 동향 지속적 파악 프로세스 존재 여부를 확인합니다.</li>
+                </ul>
+                <p class="text-sm italic my-3">시스템의 "다음 단계"는 종종 더 많은 도메인 물리학(PINN [37, 43]), 더 나은 공간 모델링(GNN [38]), 견고한 불확실성 처리(고급 확률론적 방법 [34]) 통합입니다. 아키텍처가 향후 업그레이드에 적합한지 고려합니다.</p>
+                <p class="text-sm italic my-3">설명 가능성 기법(XAI [12, 37]) 통합은 신뢰성과 진단 능력을 크게 향상시킵니다. 특히 예측이 예기치 않거나 모델 재학습 시 중요합니다.[85]</p>
+            </div>
+        </section>
+
+        <section id="conclusion" class="scroll-mt-20 mb-10">
+            <h2 class="text-2xl font-semibold border-b-2 border-[#B08D57] pb-2 mb-4">결론 및 권고 사항</h2>
+            <div class="content-card">
+                <p class="section-intro">본 보고서에서 제시된 점검 항목 및 평가 기준은 풍력 발전 예측 웹 시스템의 현재 상태를 다각도로 진단하고 향후 개선 방향을 설정하는 데 기여할 수 있습니다. 시스템은 SCADA 데이터와 기상 예보 데이터를 활용한 2단계 예측 모델, 주기적 자동 학습, 그리고 대시보드 기반의 사용자 인터페이스를 갖춘 복합적인 시스템입니다.</p>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">주요 평가 영역별 요약:</h3>
+                <ol class="list-decimal pl-6 space-y-2 mb-4">
+                    <li><strong>데이터 관리:</strong> SCADA 및 기상 데이터의 포괄성, 품질 관리 프로세스, 시계열 데이터베이스 효율성, 데이터 거버넌스는 시스템 신뢰성의 근간입니다. SCADA 데이터 해상도, 터빈 운영 상태 처리, NWP 데이터 편향 보정 및 내부 기상 모델 부가 가치 검증이 중요합니다.</li>
+                    <li><strong>예측 모델링 엔진:</strong> 기상 및 발전량 예측 모델 아키텍처, 입력 피처, 성능 지표, 검증 전략을 면밀히 평가해야 합니다. 물리 정보 기반 제약 조건 통합, 불확실성 정량화/전달 방식은 모델 현실성과 활용도를 높입니다. 피처 엔지니어링, 동적 피처 선택 가능성도 중요합니다.</li>
+                    <li><strong>MLOps 및 자동화:</strong> 자동 재학습 파이프라인 트리거, 재학습 데이터 선택, 새 모델 자동 검증/배포/롤백 메커니즘은 장기적 성능 유지에 필수적입니다. 데이터 파이프라인, 모델 성능, 시스템 인프라 포괄적 모니터링과 구조화된 로깅/효과적인 경고 시스템 구축은 운영 안정성을 보장합니다.</li>
+                    <li><strong>웹 시스템 및 대시보드:</strong> 사용자 중심 대시보드는 핵심 정보 효과적 시각화, 상호작용 통한 실행 가능한 통찰력 제공이 중요합니다. 웹 시스템 전반의 성능, 보안, 신뢰성, 확장성은 사용자 경험과 지속 가능성을 좌우합니다. MLOps 프로세스 확장성, 예측 일관성 포함 넓은 의미의 신뢰성 확보가 중요합니다.</li>
+                    <li><strong>전체 시스템 검증 및 미래 대비:</strong> 종단 간 테스트, 스트레스 시나리오 반응 테스트는 필수적입니다. 산업 표준/모범 사례 준수는 성숙도를 반영하며, PINN, GNN 등 고급 방법론 도입 가능성 및 XAI 적용은 지속적 발전 잠재력을 시사합니다.</li>
+                </ol>
+
+                <h3 class="text-xl font-semibold mt-6 mb-3">핵심 권고 사항:</h3>
+                <ul class="space-y-2">
+                    <li class="checklist-item"><strong>데이터 품질 관리 강화:</strong> 자동화된 품질 검증/정제 프로세스 강화, 데이터 이상 발생 시 명확한 알림/처리 절차 수립. 터빈 정지/출력 제한 데이터 처리 정교화.</li>
+                    <li class="checklist-item"><strong>모델 검증 심층화:</strong> 실제 현장 데이터 기반 독립적/엄격한 검증 수행. 다양한 운영 조건/극한 상황 성능 평가, 오차 원인 분석. 확률론적 예측 기능 도입 고려.</li>
+                    <li class="checklist-item"><strong>MLOps 고도화:</strong> 동적 재학습 트리거 도입. 자동 검증/안전한 배포/롤백 전략 확립. 포괄적 모니터링 시스템 구축.</li>
+                    <li class="checklist-item"><strong>사용자 중심 대시보드 개선:</strong> 실제 사용자 의사결정 지원 설계, 불확실성 정보 효과적 시각화, 맞춤형 필터링/드릴다운 강화. 로딩/반응 속도 최적화.</li>
+                    <li class="checklist-item"><strong>문서화 및 표준 준수 노력:</strong> 상세 기술 문서 확보/최신 유지. 관련 산업 표준 인지/설계 반영 노력.</li>
+                    <li class="checklist-item"><strong>지속적 개선 문화 조성:</strong> 최신 기술/연구 동향 주시, XAI 도입 통한 투명성/신뢰성 향상, 사용자 피드백 적극 수렴.</li>
+                </ul>
+                <p class="mt-4">본 보고서가 제시하는 평가 항목들을 체계적으로 점검하고 개선함으로써, 풍력 발전 예측 웹 시스템의 정확성, 신뢰성, 그리고 실질적인 활용 가치를 극대화할 수 있을 것으로 기대됩니다.</p>
+            </div>
+        </section>
+    </div>
+
+    <footer class="text-center py-6 text-sm text-[#7E6A56] border-t border-[#D1C4E9]">
+        <p>&copy; 2025 풍력 발전 예측 웹 시스템 평가 SPA. 모든 권리 보유.</p>
+        <p class="mt-1">본 SPA는 제공된 "풍력 발전 예측 웹 시스템 평가 보고서"를 기반으로 제작되었습니다.</p>
+    </footer>
+
+<script>
+    const CHART_PRIMARY_COLOR = '#B08D57'; // Antique Brass
+    const CHART_SECONDARY_COLOR = '#7E6A56'; // Darker Stone
+    const CHART_TEXT_COLOR = '#4A3B31'; // Dark Sepia
+
+    // Helper function to process labels for Chart.js (wrap long labels)
+    function processLabels(labels, maxLength = 16) {
+        return labels.map(label => {
+            if (typeof label === 'string' && label.length > maxLength) {
+                const words = label.split(' ');
+                const lines = [];
+                let currentLine = '';
+                for (const word of words) {
+                    if ((currentLine + ' ' + word).trim().length > maxLength && currentLine.length > 0) {
+                        lines.push(currentLine.trim());
+                        currentLine = word;
+                    } else {
+                        currentLine = (currentLine + ' ' + word).trim();
+                    }
+                }
+                if (currentLine.length > 0) {
+                    lines.push(currentLine.trim());
+                }
+                return lines;
+            }
+            return label;
+        });
+    }
+
+    // Tooltip callback for Chart.js to handle potentially multi-line titles
+    const tooltipTitleCallback = (tooltipItems) => {
+        const item = tooltipItems[0];
+        if (!item) return '';
+        let label = item.chart.data.labels[item.dataIndex];
+        if (Array.isArray(label)) {
+            return label.join(' ');
+        }
+        return label;
+    };
+    
+    const commonChartOptions = (legendPos = 'top') => ({
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: legendPos,
+                labels: {
+                    color: CHART_TEXT_COLOR,
+                    font: { family: "'Noto Sans KR', sans-serif" }
+                }
+            },
+            tooltip: {
+                callbacks: { title: tooltipTitleCallback },
+                bodyFont: { family: "'Noto Sans KR', sans-serif" },
+                titleFont: { family: "'Noto Sans KR', sans-serif" },
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+            }
+        },
+        scales: {
+            x: {
+                ticks: { color: CHART_TEXT_COLOR, font: { family: "'Noto Sans KR', sans-serif" }},
+                grid: { display: false }
+            },
+            y: {
+                ticks: { color: CHART_TEXT_COLOR, font: { family: "'Noto Sans KR', sans-serif" }},
+                grid: { color: 'rgba(128,128,128,0.1)' } // Lighter grid lines
+            }
+        }
+    });
+    
+    // Illustrative Chart 1: MLOps Retraining Trigger Effectiveness
+    const retrainingTriggerCtx = document.getElementById('retrainingTriggerChart');
+    if (retrainingTriggerCtx) {
+        new Chart(retrainingTriggerCtx, {
+            type: 'bar',
+            data: {
+                labels: processLabels(['시간 기반', '성능 저하 기반', '데이터 드리프트 감지 기반']),
+                datasets: [{
+                    label: '모델 성능 유지 효과 (가상 점수)',
+                    data: [65, 85, 90],
+                    backgroundColor: CHART_PRIMARY_COLOR + 'BF', // With alpha
+                    borderColor: CHART_PRIMARY_COLOR,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }, {
+                    label: '자원 효율성 (가상 점수)',
+                    data: [70, 75, 80],
+                    backgroundColor: CHART_SECONDARY_COLOR + 'BF', // With alpha
+                    borderColor: CHART_SECONDARY_COLOR,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: commonChartOptions()
+        });
+    }
+
+    // Illustrative Chart 2: Dashboard User Needs Importance
+    const dashboardNeedsCtx = document.getElementById('dashboardUserNeedsChart');
+    if (dashboardNeedsCtx) {
+        new Chart(dashboardNeedsCtx, {
+            type: 'radar',
+            data: {
+                labels: processLabels(['현재 예측 정확도', '과거 예측 이력', '예측 불확실성 정보', '실시간 알림 기능', '사용자 정의 보고서', '오류/이상징후 알림']),
+                datasets: [{
+                    label: '사용자 중요도 (운영자)',
+                    data: [9, 7, 8, 9, 6, 8.5],
+                    fill: true,
+                    backgroundColor: CHART_PRIMARY_COLOR + '4D', // More transparent fill
+                    borderColor: CHART_PRIMARY_COLOR,
+                    pointBackgroundColor: CHART_PRIMARY_COLOR,
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: CHART_PRIMARY_COLOR
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: CHART_TEXT_COLOR, font: { family: "'Noto Sans KR', sans-serif" } }
+                    },
+                    tooltip: {
+                        callbacks: { title: tooltipTitleCallback },
+                        bodyFont: { family: "'Noto Sans KR', sans-serif" },
+                        titleFont: { family: "'Noto Sans KR', sans-serif" }
+                    }
+                },
+                scales: {
+                    r: {
+                        angleLines: { color: 'rgba(128,128,128,0.2)' },
+                        grid: { color: 'rgba(128,128,128,0.2)' },
+                        suggestedMin: 0,
+                        suggestedMax: 10,
+                        pointLabels: {
+                            font: { family: "'Noto Sans KR', sans-serif", size: 11 },
+                            color: CHART_TEXT_COLOR
+                        },
+                        ticks: {
+                            backdropColor: 'rgba(253, 246, 227, 0.7)', // Match body bg with alpha
+                            color: CHART_TEXT_COLOR,
+                            font: { family: "'Noto Sans KR', sans-serif", size: 9 },
+                            stepSize: 2
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Smooth scrolling for nav links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href');
+            const targetElement = document.querySelector(targetId);
+            if (targetElement) {
+                // Remove active class from all nav links
+                document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+                // Add active class to the clicked link
+                this.classList.add('active');
+                
+                const offset = document.querySelector('.sticky-nav').offsetHeight;
+                const bodyRect = document.body.getBoundingClientRect().top;
+                const elementRect = targetElement.getBoundingClientRect().top;
+                const elementPosition = elementRect - bodyRect;
+                const offsetPosition = elementPosition - offset - 10; // 10px additional offset
+
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                });
+            }
+        });
+    });
+
+    // Highlight nav link on scroll
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('.nav-link');
+    
+    window.addEventListener('scroll', () => {
+        let current = '';
+        const navHeight = document.querySelector('.sticky-nav').offsetHeight;
+
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop - navHeight - 20; // 20px additional offset
+            if (pageYOffset >= sectionTop) {
+                current = section.getAttribute('id');
+            }
+        });
+
+        navLinks.forEach(link => {
+            link.classList.remove('active');
+            if (link.getAttribute('href').substring(1) === current) {
+                link.classList.add('active');
+            }
+        });
+    });
+
+</script>
+</body>
+</html>
