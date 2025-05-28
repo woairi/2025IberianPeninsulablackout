@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>풍력 발전량 예측 대쉬보드</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif; /* Tailwind 기본 폰트와 유사한 Inter 사용 */
+        }
+        .sidebar-item {
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+        }
+        .sidebar-item.active, .sidebar-item:hover {
+            background-color: #2563eb; /* blue-600 */
+            color: white;
+        }
+        .tab-button.active {
+            border-bottom-color: #2563eb; /* blue-600 */
+            color: #2563eb;
+            font-weight: 600;
+        }
+        .tab-button {
+            border-bottom: 2px solid transparent;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+            padding: 1.5rem; /* p-6 */
+            margin-bottom: 1.5rem; /* mb-6 */
+        }
+        .kpi-value {
+            font-size: 2.25rem; /* text-4xl */
+            font-weight: bold;
+            color: #1e40af; /* blue-800 */
+        }
+        .kpi-label {
+            font-size: 0.875rem; /* text-sm */
+            color: #6b7280; /* gray-500 */
+        }
+        .section-title {
+            font-size: 1.5rem; /* text-2xl */
+            font-weight: 600;
+            margin-bottom: 1rem; /* mb-4 */
+            color: #1f2937; /* gray-800 */
+        }
+        .alert-warning {
+            background-color: #fffbeb; /* yellow-50 */
+            border-color: #fef3c7; /* yellow-200 */
+            color: #92400e; /* yellow-700 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen">
+        <aside class="w-64 bg-gray-800 text-gray-200 flex flex-col">
+            <div class="p-6 text-2xl font-semibold text-white border-b border-gray-700">
+                <i class="fas fa-wind mr-2"></i>풍력 예측
+            </div>
+            <nav class="flex-1 mt-4">
+                <a href="#" class="sidebar-item active block py-3 px-6" data-target="overview">
+                    <i class="fas fa-tachometer-alt mr-3 w-5 text-center"></i>개요
+                </a>
+                <a href="#" class="sidebar-item block py-3 px-6" data-target="2week">
+                    <i class="fas fa-calendar-week mr-3 w-5 text-center"></i>2주 예측
+                </a>
+                <a href="#" class="sidebar-item block py-3 px-6" data-target="1month">
+                    <i class="fas fa-calendar-alt mr-3 w-5 text-center"></i>1개월 예측
+                </a>
+                <a href="#" class="sidebar-item block py-3 px-6" data-target="3month">
+                    <i class="fas fa-calendar-check mr-3 w-5 text-center"></i>3개월 예측
+                </a>
+                <a href="#" class="sidebar-item block py-3 px-6" data-target="details">
+                    <i class="fas fa-info-circle mr-3 w-5 text-center"></i>상세 정보
+                </a>
+            </nav>
+            <div class="p-4 border-t border-gray-700">
+                <p class="text-xs text-gray-400">버전 1.0.0</p>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col overflow-hidden">
+            <header class="bg-white shadow-md p-4 flex justify-between items-center">
+                <h1 id="main-title" class="text-xl font-semibold text-gray-700">개요</h1>
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <select class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                            <option selected>운영 계획</option>
+                            <option value="maintenance">유지보수</option>
+                            <option value="bidding">시장 입찰</option>
+                            <option value="finance">재정 계획</option>
+                        </select>
+                    </div>
+                    <button class="text-gray-500 hover:text-blue-600">
+                        <i class="fas fa-bell fa-lg"></i>
+                    </button>
+                    <div class="flex items-center">
+                         <img src="https://placehold.co/40x40/E2E8F0/A0AEC0?text=User" alt="사용자 아바타" class="w-8 h-8 rounded-full mr-2">
+                        <span class="text-sm text-gray-700">사용자명</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="flex-1 p-6 overflow-y-auto">
+                <section id="overview-content" class="content-section">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div class="card lg:col-span-2">
+                            <h2 class="section-title">현재 상태 및 주요 KPI</h2>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <p class="kpi-label">실시간 발전량 (연동 시)</p>
+                                    <p class="kpi-value">125 <span class="text-lg">MW</span></p>
+                                </div>
+                                <div>
+                                    <p class="kpi-label">금주 예상 평균 발전량</p>
+                                    <p class="kpi-value">980 <span class="text-lg">MWh</span></p>
+                                    <p class="text-xs text-green-500">+5% (과거 평균 대비)</p>
+                                </div>
+                                <div>
+                                    <p class="kpi-label">차주 예상 평균 발전량</p>
+                                    <p class="kpi-value">1150 <span class="text-lg">MWh</span></p>
+                                    <p class="text-xs text-gray-500">(950 ~ 1350 MWh 범위)</p>
+                                </div>
+                                <div>
+                                    <p class="kpi-label">주요 알림</p>
+                                    <p class="text-sm text-yellow-600"><i class="fas fa-exclamation-triangle mr-1"></i>3일 후 발전량 급감 예상</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h2 class="section-title">3개월 예측 요약</h2>
+                            <img src="https://placehold.co/600x400/E0F2FE/0EA5E9?text=월별+평균+발전량+예측+그래프" alt="3개월 예측 요약 그래프" class="w-full h-auto rounded-md">
+                            <p class="text-xs text-gray-500 mt-2 text-center">월별 평균 발전량 (예측 범위 포함)</p>
+                        </div>
+                    </div>
+                     <div class="card mt-6">
+                        <h2 class="section-title">발전소 위치 (예시)</h2>
+                        <img src="https://placehold.co/1200x400/E5E7EB/4B5563?text=발전소+위치+지도+예시" alt="발전소 위치 지도" class="w-full h-auto rounded-md">
+                    </div>
+                </section>
+
+                <section id="2week-content" class="content-section hidden">
+                    <h2 class="section-title">2주 발전량 예측</h2>
+                    <div class="mb-4 border-b border-gray-200">
+                        <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" id="twoWeekTabs" role="tablist">
+                            <li class="mr-2" role="presentation">
+                                <button class="tab-button inline-block p-4 rounded-t-lg active" id="2week-weekly-tab" data-tabs-target="#2week-weekly" type="button" role="tab" aria-controls="2week-weekly" aria-selected="true">주평균 예측</button>
+                            </li>
+                            <li class="mr-2" role="presentation">
+                                <button class="tab-button inline-block p-4 rounded-t-lg" id="2week-daily-tab" data-tabs-target="#2week-daily" type="button" role="tab" aria-controls="2week-daily" aria-selected="false">일평균 예측 (참고)</button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div id="twoWeekTabsContent">
+                        <div class="card" id="2week-weekly" role="tabpanel" aria-labelledby="2week-weekly-tab">
+                            <h3 class="text-xl font-semibold mb-3">주평균 발전량</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <div class="p-4 bg-blue-50 rounded-lg">
+                                    <p class="kpi-label">1주차 예상 발전량</p>
+                                    <p class="kpi-value text-3xl">1050 <span class="text-base">MWh</span></p>
+                                    <p class="text-xs text-gray-500">(900 ~ 1200 MWh 범위)</p>
+                                </div>
+                                <div class="p-4 bg-blue-50 rounded-lg">
+                                    <p class="kpi-label">2주차 예상 발전량</p>
+                                    <p class="kpi-value text-3xl">1120 <span class="text-base">MWh</span></p>
+                                    <p class="text-xs text-gray-500">(950 ~ 1300 MWh 범위)</p>
+                                </div>
+                            </div>
+                            <img src="https://placehold.co/1000x400/CCEEFF/0077CC?text=2주간+주평균+발전량+그래프+(예측범위+포함)" alt="2주간 주평균 발전량 그래프" class="w-full h-auto rounded-md">
+                        </div>
+                        <div class="card hidden" id="2week-daily" role="tabpanel" aria-labelledby="2week-daily-tab">
+                            <div class="p-4 mb-4 text-sm text-yellow-700 bg-yellow-100 rounded-lg alert-warning" role="alert">
+                                <i class="fas fa-exclamation-triangle mr-2"></i><strong>주의:</strong> 일평균 예측은 변동성이 크므로, 주간 경향성 및 변동성 파악 용도로 활용하십시오.
+                            </div>
+                            <h3 class="text-xl font-semibold mb-3">일평균 발전량 (참고용)</h3>
+                            <img src="https://placehold.co/1000x400/FFF9C4/FBC02D?text=14일간+일평균+발전량+선+그래프+(넓은+예측범위)" alt="14일간 일평균 발전량 그래프" class="w-full h-auto rounded-md">
+                        </div>
+                    </div>
+                </section>
+
+                <section id="1month-content" class="content-section hidden">
+                    <h2 class="section-title">1개월 발전량 예측</h2>
+                     <div class="card">
+                        <h3 class="text-xl font-semibold mb-3">주평균 발전량 (4주)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            <div class="p-3 bg-indigo-50 rounded-lg">
+                                <p class="kpi-label">1주차</p><p class="kpi-value text-2xl">950 <span class="text-sm">MWh</span></p>
+                            </div>
+                            <div class="p-3 bg-indigo-50 rounded-lg">
+                                <p class="kpi-label">2주차</p><p class="kpi-value text-2xl">1020 <span class="text-sm">MWh</span></p>
+                            </div>
+                            <div class="p-3 bg-indigo-50 rounded-lg">
+                                <p class="kpi-label">3주차</p><p class="kpi-value text-2xl">980 <span class="text-sm">MWh</span></p>
+                            </div>
+                            <div class="p-3 bg-indigo-50 rounded-lg">
+                                <p class="kpi-label">4주차</p><p class="kpi-value text-2xl">1100 <span class="text-sm">MWh</span></p>
+                            </div>
+                        </div>
+                        <p class="text-lg font-semibold mb-2">월 전체 예상 발전량: <span class="text-blue-700">4.05 GWh</span> (3.5 ~ 4.6 GWh 범위)</p>
+                        <img src="https://placehold.co/1000x400/E0E7FF/4338CA?text=1개월+주평균+발전량+그래프" alt="1개월 주평균 발전량 그래프" class="w-full h-auto rounded-md">
+                    </div>
+                </section>
+
+                <section id="3month-content" class="content-section hidden">
+                    <h2 class="section-title">3개월 발전량 예측</h2>
+                    <div class="card mb-6">
+                        <h3 class="text-xl font-semibold mb-3">월평균 발전량</h3>
+                        <img src="https://placehold.co/1000x350/F3E8FF/86198F?text=3개월+월평균+발전량+막대그래프+(예측범위)" alt="3개월 월평균 발전량 그래프" class="w-full h-auto rounded-md">
+                        <p class="text-center mt-2 text-xs text-gray-500">과거 동기간 평균 및 장기 기후 전망 반영</p>
+                    </div>
+                    <div class="card">
+                        <h3 class="text-xl font-semibold mb-3">주평균 발전량 (12주)</h3>
+                        <img src="https://placehold.co/1000x350/E0F2F7/0E7490?text=3개월+주평균+발전량+선그래프+(넓은+예측범위)" alt="3개월 주평균 발전량 그래프" class="w-full h-auto rounded-md">
+                    </div>
+                </section>
+
+                <section id="details-content" class="content-section hidden">
+                    <h2 class="section-title">상세 정보 및 신뢰도</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="card">
+                            <h3 class="text-xl font-semibold mb-3">예측 확률 분포 (예시)</h3>
+                            <p class="mb-2 text-sm">확인할 기간 선택:
+                                <select class="text-sm p-1 border rounded-md">
+                                    <option>다음 주</option>
+                                    <option>다음 달</option>
+                                </select>
+                            </p>
+                            <img src="https://placehold.co/600x400/FEFCE8/EAB308?text=선택기간+발전량+확률분포+히스토그램" alt="확률 분포 그래프" class="w-full h-auto rounded-md">
+                        </div>
+                        <div class="card">
+                            <h3 class="text-xl font-semibold mb-3">데이터 소스 및 모델 정보</h3>
+                            <ul class="list-disc list-inside text-sm space-y-1 text-gray-700">
+                                <li>기상 예측 모델: GFS, ECMWF (앙상블)</li>
+                                <li>과거 데이터 기간: 2015년 ~ 현재</li>
+                                <li>예측 모델: LSTM 기반 시계열 모델</li>
+                                <li>주요 가정: ...</li>
+                                <li>최근 업데이트: 2025-05-28 09:00 KST</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const sidebarItems = document.querySelectorAll('.sidebar-item');
+        const contentSections = document.querySelectorAll('.content-section');
+        const mainTitle = document.getElementById('main-title');
+
+        sidebarItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+
+                // Update active sidebar item
+                sidebarItems.forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+
+                const targetId = item.getAttribute('data-target');
+                mainTitle.textContent = item.textContent.trim(); // Update header title
+
+                // Show target content section
+                contentSections.forEach(section => {
+                    if (section.id === `${targetId}-content`) {
+                        section.classList.remove('hidden');
+                    } else {
+                        section.classList.add('hidden');
+                    }
+                });
+            });
+        });
+
+        // Tab functionality for 2-week forecast
+        const twoWeekTabs = document.querySelectorAll('#twoWeekTabs .tab-button');
+        const twoWeekTabContents = document.querySelectorAll('#twoWeekTabsContent > div');
+
+        twoWeekTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                twoWeekTabs.forEach(t => {
+                    t.classList.remove('active');
+                    t.setAttribute('aria-selected', 'false');
+                });
+                tab.classList.add('active');
+                tab.setAttribute('aria-selected', 'true');
+
+                const targetPanelId = tab.getAttribute('data-tabs-target');
+                twoWeekTabContents.forEach(panel => {
+                    if (panel.id === targetPanelId.substring(1)) { // Remove # from targetPanelId
+                        panel.classList.remove('hidden');
+                    } else {
+                        panel.classList.add('hidden');
+                    }
+                });
+            });
+        });
+
+        // Initialize default view (Overview)
+        document.querySelector('.sidebar-item[data-target="overview"]').click();
+        // Initialize default tab for 2-week forecast
+        if (document.getElementById('2week-weekly-tab')) {
+             document.getElementById('2week-weekly-tab').click();
+        }
+
+    </script>
+</body>
+</html>
